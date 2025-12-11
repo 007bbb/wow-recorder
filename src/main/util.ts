@@ -879,9 +879,12 @@ const takeOwnershipBufferDir = async (dir: string) => {
 const logAxiosError = (msg: string, error: AxiosError) => {
   console.error(msg, {
     message: error.message,
-    status: error.response?.status,
-    data: error.response?.data,
+    status: error.status,
+    code: error.code,
+    cause: error.cause,
     url: error.config?.url,
+    rspStatus: error.response?.status,
+    rspData: error.response?.data,
   });
 };
 

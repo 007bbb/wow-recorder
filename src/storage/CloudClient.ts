@@ -22,6 +22,7 @@ import { getCloudConfig } from 'utils/configUtils';
 import { clipboard, ipcMain } from 'electron';
 import VideoProcessQueue from 'main/VideoProcessQueue';
 import { send } from 'main/main';
+import { VideoCategory } from 'types/VideoCategory';
 
 const enum VideoMessages {
   CREATE = 'vc',
@@ -1420,19 +1421,43 @@ export default class CloudClient implements StorageClient {
   public async getOrCreateChatCorrelator(video: RendererVideo) {
     console.info('[CloudClient] Get or create chat correlator');
 
-    const { uniqueHash, start } = video;
+    const { category, uniqueHash, start, videoName, duration, clippedAt } =
+      video;
 
     if (!start || !uniqueHash) {
       console.error(
         '[CloudClient] Unable to get or create chat correlator for this video',
+        category,
         start,
         uniqueHash,
+        videoName,
+        duration,
+        clippedAt,
       );
+
       throw new Error('Unable to get or create chat correlator for this video');
     }
 
+    // Build the URL based on whether we need a named correlator or not. For
+    // clips and manual we can't rely on the uniqueHash to actually be unique
+    // so we have to build a unique name for the chat correlator.
     const guild = encodeURIComponent(this.guild);
-    const url = `${CloudClient.api}/guild/${guild}/chat/${uniqueHash}/${start}`;
+    let url = `${CloudClient.api}/guild/${guild}/`;
+
+    if (category === VideoCategory.Manual || category === VideoCategory.Clips) {
+      let uniqueName = `${encodeURIComponent(videoName)} - ${duration.toFixed(2)}`;
+
+      if (category === VideoCategory.Clips) {
+        // Clips default to 30s so decent chance of a collision, so
+        // also add the clippedAt time.
+        uniqueName += ` - ${clippedAt}`;
+      }
+
+      url += `named-chat/${uniqueName}`;
+    } else {
+      url += `chat/${uniqueHash}/${start}`;
+    }
+
     const headers = { Authorization: this.authHeader };
 
     const rsp = await axios.post(url, undefined, {
